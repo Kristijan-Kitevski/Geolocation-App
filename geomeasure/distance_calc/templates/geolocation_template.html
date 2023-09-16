@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Geolocation</title>
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			margin: 0;
+			padding: 0;
+			background-color: #f5f5f5;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100vh;
+		}
+
+		.container {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			flex-wrap: wrap;
+			background-color: #fff;
+			padding: 20px;
+			border-radius: 5px;
+			box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+			width: 70%;
+			min-width: 400px;
+		}
+
+		.left {
+			width: 48%;
+		}
+
+		.right {
+			width: 48%;
+		}
+
+		h1 {
+			color: #333;
+		}
+
+		form {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			width: 100%;
+			padding: 10px;
+		}
+
+		label {
+			font-weight: bold;
+			color: #555;
+			margin-bottom: 5px;
+		}
+
+		input[type="text"] {
+			width: 90%;
+			padding: 10px;
+			margin-bottom: 10px;
+			border: 1px solid #ccc;
+			border-radius: 5px;
+		}
+
+		button {
+			background-color: #007BFF;
+			color: #fff;
+			border: none;
+			border-radius: 5px;
+			padding: 10px 20px;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+
+		button:hover {
+			background-color: #0056b3;
+		}
+
+		#map {
+			height: 400px;
+			width: 100%;
+			margin-top: 20px;
+		}
+
+		#result {
+			font-size: 18px;
+			font-weight: bold;
+			color: #333;
+			margin-top: 20px;
+		}
+
+		#results-box {
+			border: 1px solid #ccc;
+			padding: 10px;
+			margin-top: 5px;
+			width: 90%;
+			height: 70px;
+		}
+		#last-search-location1, 
+		#last-search-location2,
+		#last-search-distance{
+			padding: 3px;
+			font-size: 15px;
+			margin: 0;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<div class="left">
+			<h1>Geolocation</h1>
+			<form>
+				{% csrf_token %}
+				<label for="location1">Location 1:</label>
+				<input type="text" id="location1" placeholder="Enter a location">
+				<label for="location2">Location 2:</label>
+				<input type="text" id="location2" placeholder="Enter a location">
+				<button type="button" onclick="calculateDistance()">Calculate Distance</button>
+			</form>
+			
+			<p>Last Searched:</p>
+			<div id="results-box">
+				<p id="last-search-location1"></p>
+				<p id="last-search-location2"></p>
+				<p id="last-search-distance"></p>
+			</div>
+		</div>
+		<div class="right">
+			<div id="map"></div>
+			<div id="result"></div>
+		</div>
+	</div>
+
+	<script>
+		const apiKey = 'AIzaSyCwduiTEpSUh1i9hQknsrrQrnMb-W-Qvy8';
+
+		function updateLastSearchResults(location1, location2, distance) {
+			const location1Element = document.getElementById('last-search-location1');
+			const location2Element = document.getElementById('last-search-location2');
+			const distanceElement = document.getElementById('last-search-distance');
+
+			location1Element.textContent = `${location1}`;
+			location2Element.textContent = `${location2}`;
+			distanceElement.textContent = `Distance: ${distance} km`;
+		}
+
+		function initMap() {
+			const map = new google.maps.Map(document.getElementById('map'), {
+				center: { lat: 41.9973, lng: 21.4280 }, // Centered on Skopje
+				zoom: 7,
+			});
+
+			const marker1 = new google.maps.Marker({
+				map: map,
+				label: 'A',
+			});
+
+			const marker2 = new google.maps.Marker({
+				map: map,
+				label: 'B',
+			});
+
+			const location1Input = document.getElementById('location1');
+			const location2Input = document.getElementById('location2');
+
+			const autocomplete1 = new google.maps.places.Autocomplete(location1Input);
+			autocomplete1.setFields(['geometry', 'name']);
+
+			const autocomplete2 = new google.maps.places.Autocomplete(location2Input);
+			autocomplete2.setFields(['geometry', 'name']);
+
+			autocomplete1.addListener('place_changed', function () {
+				const place = autocomplete1.getPlace();
+				if (!place.geometry) {
+					return;
+				}
+				marker1.setPosition(place.geometry.location);
+				map.setCenter(place.geometry.location);
+			});
+
+			autocomplete2.addListener('place_changed', function () {
+				const place = autocomplete2.getPlace();
+				if (!place.geometry) {
+					return;
+				}
+				marker2.setPosition(place.geometry.location);
+				map.setCenter(place.geometry.location);
+			});
+		}
+		function getCookie(name) {
+			let cookieValue = null;
+			if (document.cookie && document.cookie !== '') {
+				const cookies = document.cookie.split(';');
+				for (let i = 0; i < cookies.length; i++) {
+					const cookie = cookies[i].trim();
+					// Check if the cookie name matches the csrf token cookie name used by Django
+					if (cookie.startsWith(name + '=')) {
+						cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+						break;
+					}
+				}
+			}
+			return cookieValue;
+		}
+		function calculateDistance() {
+			const location1 = document.getElementById('location1').value;
+			const location2 = document.getElementById('location2').value;
+
+			if (!location1 || !location2) {
+				alert('Please enter both locations.');
+				return;
+			}
+
+			const requestData = [
+				{ place: location1 },
+				{ place: location2 },
+			];
+
+			fetch('/api/calculate-distance/', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': getCookie('csrftoken'),
+				},
+				body: JSON.stringify(requestData),
+			})
+				.then((response) => response.json())
+				.then((data) => {
+					const resultElement = document.getElementById('result');
+					if (data.length > 0) {
+						const distance = data[0].distance;
+						resultElement.textContent = `Distance: ${distance} km`;
+					} else {
+						resultElement.textContent = 'No distance data available.';
+					}
+				})
+				.catch((error) => {
+					console.error('Error:', error);
+				});
+		}
+
+		function getSearchHistory(){
+			fetch('/api/history/', {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': getCookie('csrftoken'),
+				},
+			})
+				.then((response) => response.json())
+				.then((data) => {
+					if (data.length > 0) {
+						updateLastSearchResults(data[0].place1, data[0].place2, data[0].distance)
+					} else {
+						resultElement.textContent = 'No data available.';
+					}
+				})
+				.catch((error) => {
+					console.error('Error:', error);
+				});
+		}
+		document.addEventListener("DOMContentLoaded", function () {
+				getSearchHistory();
+		});
+
+		const scriptSrc = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
+		const script = document.createElement('script');
+		script.src = scriptSrc;
+		document.body.appendChild(script);
+	</script>
+</body>
+
+</html>

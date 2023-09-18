@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Geolocation</title>
@@ -98,12 +99,35 @@
 			width: 90%;
 			height: 70px;
 		}
-		#last-search-location1, 
+
+		#last-search-location1,
 		#last-search-location2,
-		#last-search-distance{
+		#last-search-distance {
 			padding: 3px;
 			font-size: 15px;
 			margin: 0;
+		}
+
+		#chatbot-button {
+			position: fixed;
+			bottom: 40px;
+			right: 40px;
+			background-color: lightgreen;
+			color: black;
+			border: none;
+			border-radius: 50%;
+			width: 80px;
+			height: 80px;
+			font-size: 15px;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+		.material-symbols-outlined {
+			font-size: 30px;
+			color: white;
+		}
+		#chatbot-button:hover {
+			background-color: darkgreen;
 		}
 	</style>
 </head>
@@ -120,7 +144,7 @@
 				<input type="text" id="location2" placeholder="Enter a location">
 				<button type="button" onclick="calculateDistance()">Calculate Distance</button>
 			</form>
-			
+
 			<p>Last Searched:</p>
 			<div id="results-box">
 				<p id="last-search-location1"></p>
@@ -133,7 +157,9 @@
 			<div id="result"></div>
 		</div>
 	</div>
-
+	<button id="chatbot-button" onclick="navigateToChatbot()"><span class="material-symbols-outlined">
+		headset_mic
+		</span></button>
 	<script>
 		const apiKey = 'AIzaSyCwduiTEpSUh1i9hQknsrrQrnMb-W-Qvy8';
 
@@ -242,7 +268,7 @@
 				});
 		}
 
-		function getSearchHistory(){
+		function getSearchHistory() {
 			fetch('/api/history/', {
 				method: 'GET',
 				headers: {
@@ -262,8 +288,11 @@
 					console.error('Error:', error);
 				});
 		}
+		function navigateToChatbot() {
+			window.location.href = "{% url 'chat_bot' %}";
+		}
 		document.addEventListener("DOMContentLoaded", function () {
-				getSearchHistory();
+			getSearchHistory();
 		});
 
 		const scriptSrc = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;

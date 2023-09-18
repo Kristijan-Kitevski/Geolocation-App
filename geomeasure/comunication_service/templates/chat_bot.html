@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<title>Chatbot</title>
+	<style>
+		.chat-container {
+			border: 1px solid #ccc;
+			width: 300px;
+			padding: 10px;
+			margin: 0 auto;
+			background-color: #f9f9f9;
+		}
+
+		.chat-message,
+		.chat-message-bot {
+			margin: 10px;
+			padding: 5px;
+			background-color: #e0f0f0;
+			border-radius: 5px;
+		}
+
+		.chat-message-bot {
+			background-color: lightgreen;
+		}
+
+		#user-input {
+			margin: 10px;
+			padding: 5px;
+			border: 1px solid #ccc;
+			border-radius: 5px;
+		}
+
+		#submit-button {
+			margin-top: 10px;
+			background-color: #007bff;
+			color: white;
+			border: none;
+			padding: 5px 10px;
+			cursor: pointer;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="chat-container">
+		<div class="chat-message-bot">Welcome to the Chatbot! <br> Please enter your message:</div>
+		<div class="input-text"></div>
+		<input type="text" id="user-input">
+		<button id="submit-button">Send</button>
+	</div>
+
+	<script>
+		const chatContainer = document.querySelector('.chat-container');
+		const inputContainer = document.querySelector('.input-text');
+		const userInput = document.getElementById('user-input');
+		const submitButton = document.getElementById('submit-button');
+		let session_actve = false;
+
+		function getCookie(name) {
+			let cookieValue = null;
+			if (document.cookie && document.cookie !== '') {
+				const cookies = document.cookie.split(';');
+				for (let i = 0; i < cookies.length; i++) {
+					const cookie = cookies[i].trim();
+					// Check if the cookie name matches the csrf token cookie name used by Django
+					if (cookie.startsWith(name + '=')) {
+						cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+						break;
+					}
+				}
+			}
+			return cookieValue;
+		}
+
+		function displayUserMessage(message) {
+			const messageDiv = document.createElement('div');
+			messageDiv.className = 'chat-message';
+			messageDiv.textContent = `You: ${message}`;
+			inputContainer.appendChild(messageDiv);
+			userInput.value = '';
+		}
+
+		function displayChatBotMessage(message) {
+			const messageDiv = document.createElement('div');
+			messageDiv.className = 'chat-message-bot';
+			messageDiv.textContent = `${message}`;
+			inputContainer.appendChild(messageDiv);
+		}
+
+		async function checkSessionExpiration() {
+			fetch('/check-session-expiration/')
+				.then(response => response.json())
+				.then(data => {
+					if (data.message === 'Session ended') {
+						displayChatBotMessage('Your session has ended. Please enter your phone number! eg +38978111222')
+						session_actve = false;
+					} else if (data.message === 'Session does not exist.') {
+						alert('Session does not exist.');
+					} else {
+						console.log('Session is active.');
+						session_actve = true;
+					}
+				})
+				.catch(error => console.error('Error checking session expiration:', error));;
+		}
+
+		function countdown(action) {
+			if (action === 'start') {
+				sessionInterval = setInterval(() => {
+					checkSessionExpiration();
+				}, 60000);
+				console.log('countdown started');
+			} else if (action === 'stop') {
+				clearInterval(sessionInterval);
+			}
+		}
+
+		function triggerSessionUpdate() {
+			fetch('/update-session-expiration/')
+				.then(response => {
+					if (response.status === 200) {
+						console.log('Session updated successfully');
+					} else {
+						console.error('Session update failed');
+					}
+				})
+				.catch(error => {
+					console.error('Error while updating session:', error);
+				});
+		}
+
+		function saveMessage(message) {
+			fetch('/api/receive_message/', {
+				method: 'POST',
+				body: JSON.stringify({ 'message': message }),
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': getCookie('csrftoken'),
+				},
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data) {
+						console.log(data.message);
+					}
+				})
+				.catch(error => {
+					console.error('Error while updating session:', error);
+				});
+		}
+
+
+		function checkPhoneNumberForFraud(phone) {
+			fetch('/api/check-fraud/', {
+				method: 'POST',
+				body: JSON.stringify({ 'phone_number': phone }),
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': getCookie('csrftoken'),
+				},
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data) {
+						displayChatBotMessage(data.message);
+					}
+				})
+				.catch(error => {
+					console.error('Error checking phone number for fraud:', error);
+				});
+		}
+
+		function getSearchedArticles(message) {
+			fetch('/api/get_article/', {
+				method: 'POST',
+				body: JSON.stringify({ 'message': message }),
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': getCookie('csrftoken'),
+				},
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data && Array.isArray(data.message)) {
+						const articles = data.message;
+						articles.forEach(article => {
+							displayChatBotMessage("Chatbot: " + article.title);
+							displayChatBotMessage(article.content);
+						});
+					} else if (data && data.message) {
+						displayChatBotMessage("Chatbot: " + data.message);
+					}
+				})
+				.catch(error => {
+					console.error('Error articles:', error);
+				});
+		}
+
+		submitButton.addEventListener('click', () => {
+			const user_message = userInput.value;
+			saveMessage(user_message)
+			displayUserMessage(user_message);
+			chatbotLogic(user_message); 
+		});
+
+		function chatbotLogic(message) {
+			let usr_msg_lower = message.toLowerCase();
+			const words = usr_msg_lower.split(/\s+/);
+			let match_found = false;
+			for (let word of words) {
+				const phone_regex = /(\+\d{1,3}\s?)?(\()?\d{3}(\))?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+				const phone_numbers = word.match(phone_regex);
+				if (!session_actve && phone_numbers === null) {
+					return
+				}
+				if (word.includes("hi")) {
+					displayChatBotMessage("Chatbot: Hi, how may I be of service.");
+					triggerSessionUpdate()
+					match_found = true;
+					return
+				}
+				if (word.includes("article")) {
+					getSearchedArticles(message);
+					triggerSessionUpdate()
+					match_found = true;
+					return
+				}
+				if (phone_numbers && phone_numbers.length > 0) {
+					for (let phone_number of phone_numbers) {
+						triggerSessionUpdate();
+						checkPhoneNumberForFraud(phone_number);
+					}
+					match_found = true;
+					return;
+				}
+				if (word.includes("bye")) {
+					triggerSessionUpdate()
+					displayChatBotMessage("Chatbot: See you later!");
+					match_found = true;
+					return
+				}
+				if (word.includes("thanks") || word.includes("thank")) {
+					displayChatBotMessage("Chatbot: You are welcome!");
+					match_found = true;
+					return
+				}
+
+			};
+			if (!match_found) {
+				displayChatBotMessage("Chatbot: Sorry, I did not understand your message.");
+			}
+			countdown('start')
+		};
+		window.onload = async function() {
+			await checkSessionExpiration();
+		};
+	</script>
+</body>
+
+</html>

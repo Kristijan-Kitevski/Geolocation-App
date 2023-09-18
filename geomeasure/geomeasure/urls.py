@@ -20,4 +20,5 @@ from django.urls import path, include
 urlpatterns = [
 	path('admin/', admin.site.urls),
 	path('', include('distance_calc.urls')),
+	 path('', include('comunication_service.urls')),
 ]

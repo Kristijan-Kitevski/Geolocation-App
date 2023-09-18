@@ -1,8 +1,13 @@
 import json
+import os
+import random
 import re
-from .models import UserInteraction
-from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 import phonenumbers
+from django.conf import settings
+from django.http import HttpResponse, JsonResponse
+
+from .models import UserInteraction
 
 
 def get_articles(request):
@@ -72,3 +77,27 @@ def receive_message(request):
 		return JsonResponse({"message": "Message saved successfully"})
 	except Exception as e:
 		return JsonResponse({"message": str(e)})
+
+
+
+def image_responder(request):
+	try:
+		images_folder = 'media'
+
+		image_files = [f for f in os.listdir(images_folder) if os.path.isfile(os.path.join(images_folder, f))]
+
+		if image_files:
+			random_image_filename = random.choice(image_files)
+			image_path = os.path.join(images_folder, random_image_filename)
+
+			with open(image_path, 'rb') as image_file:
+				response = HttpResponse(image_file.read(), content_type="image/jpeg")
+				return response
+		else:
+			return JsonResponse({"message": "No images available"})
+
+	except FileNotFoundError:
+		return JsonResponse({"message": "Image file not found"}, status=404)
+
+	except Exception as e:
+		return JsonResponse({"message": str(e)}, status=500)

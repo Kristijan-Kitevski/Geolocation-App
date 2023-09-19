@@ -44,7 +44,8 @@ def check_fraud(request):
 		return JsonResponse({"message": "Invalid phone number"})
 	is_fraud = check_if_in_fraud_data(phone_number)
 	if is_fraud:
-		return JsonResponse({"message": "Phone number found in fraud data"})
+		return image_responder(request, is_fraud=True)
+		
 	return JsonResponse({"message": "Phone number is valid"})
 
 
@@ -59,10 +60,10 @@ def is_valid_phone_number(phone_number_str):
 
 def check_if_in_fraud_data(phone_number):
 	mock_fraud_data = {
-		1:"1234567890",
-		2:"9876543210",
-		3:"1234567890",
-		4:"9876543210"
+		"+38978111222":1,
+		"+38900111222":2,
+		"+38973111222":3,
+		"+38979111222":4
 	}
 	return mock_fraud_data.get(phone_number, False)
 
@@ -80,11 +81,19 @@ def receive_message(request):
 
 
 
-def image_responder(request):
+def image_responder(request, is_fraud=False ):
+	images_folder = 'media'
+	if is_fraud:
+		images_folder = 'media/fraud'
 	try:
-		images_folder = 'media'
+		image_files = []
 
-		image_files = [f for f in os.listdir(images_folder) if os.path.isfile(os.path.join(images_folder, f))]
+		for item_name in os.listdir(images_folder):
+			item_path = os.path.join(images_folder, item_name)
+			is_file = os.path.isfile(item_path)
+			
+			if is_file:
+				image_files.append(item_name)
 
 		if image_files:
 			random_image_filename = random.choice(image_files)

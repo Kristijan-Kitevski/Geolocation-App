@@ -125,6 +125,15 @@
 			inputContainer.appendChild(messageDiv);
 		}
 
+		function displayImage(blob){
+			const imgElement = document.createElement('img');
+			imgElement.src = URL.createObjectURL(blob);
+			imgElement.alt = 'Fetched Image';
+			imgElement.className = 'chat-image';
+			inputContainer.appendChild(imgElement);
+			imageUploadInput.value = null;
+		}
+
 		function handleImageUpload() {
 			const file = imageUploadInput.files[0];
 			if (file) {
@@ -147,19 +156,14 @@
 				})
 					.then(response => {
 						if (response.ok) {
-							return response.blob(); // Get the image file as a blob
+							return response.blob();
 						} else {
 							throw new Error('Image upload failed');
 						}
 					})
 					.then(blob => {
 						displayChatBotMessage('Cool image! Check out my image!')
-						const imgElement = document.createElement('img');
-						imgElement.src = URL.createObjectURL(blob);
-						imgElement.alt = 'Fetched Image';
-						imgElement.className = 'chat-image';
-						inputContainer.appendChild(imgElement);
-						imageUploadInput.value = null;
+						displayImage(blob);
 					})
 					.catch(error => {
 						console.error('Error uploading image:', error);
@@ -238,10 +242,20 @@
 					'X-CSRFToken': getCookie('csrftoken'),
 				},
 			})
-				.then(response => response.json())
-				.then(data => {
-					if (data) {
-						displayChatBotMessage(data.message);
+				.then(response => {
+					const contentType = response.headers.get('Content-Type');
+					if (contentType && contentType.startsWith('application/json')) {
+						return response.json()
+							.then(data => {
+								if (data) {
+									displayChatBotMessage(data.message);
+								}
+							});
+					} else if (contentType && contentType.startsWith('image')) {
+						return response.blob()
+							.then(blob => {
+								displayImage(blob);
+							});
 					}
 				})
 				.catch(error => {
@@ -274,13 +288,6 @@
 					console.error('Error articles:', error);
 				});
 		}
-
-		submitButton.addEventListener('click', () => {
-			const user_message = userInput.value;
-			saveMessage(user_message)
-			displayUserMessage(user_message);
-			chatbotLogic(user_message);
-		});
 
 		function chatbotLogic(message) {
 			let usr_msg_lower = message.toLowerCase();
@@ -331,6 +338,22 @@
 			}
 			triggerSessionUpdate()
 		};
+
+		function handleUserInput() {
+			const user_message = userInput.value;
+			saveMessage(user_message);
+			displayUserMessage(user_message);
+			chatbotLogic(user_message);
+		}
+
+		submitButton.addEventListener('click', handleUserInput);
+
+		userInput.addEventListener('keydown', event => {
+			if (event.key === 'Enter') {
+				handleUserInput();
+			}
+		});
+
 		window.onload = function () {
 			checkSessionExpiration();
 		};
